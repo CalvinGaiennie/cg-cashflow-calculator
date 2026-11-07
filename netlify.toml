@@ -1,0 +1,9 @@
+# Static single page + Intintus backend proxy (same pattern as Int2.0 / camping).
+# Site env: INTINTUS_BACKEND_URL=https://habittrackerpythonbackend.onrender.com
+
+[build]
+  publish = "."
+
+[[edge_functions]]
+  path = "/api/*"
+  function = "api-proxy"

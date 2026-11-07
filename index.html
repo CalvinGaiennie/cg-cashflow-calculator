@@ -124,12 +124,116 @@
       margin-top: 1rem;
       line-height: 1.45;
     }
+    button {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: #0b1220;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.5rem 0.85rem;
+      white-space: nowrap;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    button.danger {
+      background: transparent;
+      color: #f07178;
+      border-color: #5a2d33;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .row > label { flex: 1 1 180px; }
+    .account {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.8125rem;
+    }
+    .muted { color: var(--muted); }
+    .status-error { color: #f07178; }
+    .editing {
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.65rem 0.8rem;
+      margin-bottom: 0.9rem;
+      font-size: 0.8125rem;
+    }
+    .editing .row { align-items: center; margin-top: 0.5rem; }
+    .snapshot-list {
+      list-style: none;
+      margin: 1rem 0 0;
+      padding: 0;
+      display: grid;
+      gap: 0.5rem;
+    }
+    .snapshot-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+    .snapshot-list li.active { border-color: var(--accent); }
+    .snapshot-meta { display: flex; flex-direction: column; min-width: 0; }
+    .snapshot-name { font-weight: 600; overflow-wrap: anywhere; }
+    .snapshot-sub { font-size: 0.75rem; color: var(--muted); }
+    .snapshot-cash { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .snapshot-cash.positive { color: #3dd68c; }
+    .snapshot-cash.negative { color: #f07178; }
+    .snapshot-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .snapshot-actions button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <div class="wrap" id="app">
     <h1>Monthly Cashflow</h1>
     <p class="subtitle">Rates, hours, and project revenue update totals live.</p>
+
+    <section id="accountSection">
+      <h2>Intintus account</h2>
+      <form id="loginForm" hidden>
+        <p class="muted" style="margin:0 0 0.85rem;font-size:0.8125rem;">
+          Sign in with your Intintus account to save your numbers and snapshots.
+        </p>
+        <div class="row">
+          <label>
+            <span>Email</span>
+            <input type="email" id="loginEmail" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" id="loginPassword" autocomplete="current-password" required />
+          </label>
+          <button type="submit" id="loginBtn">Sign in</button>
+        </div>
+        <p class="status-error" id="loginError" style="margin:0.6rem 0 0;font-size:0.8125rem;" hidden></p>
+      </form>
+      <div class="account" id="accountInfo" hidden>
+        <span>Signed in as <strong id="accountEmail"></strong></span>
+        <span class="row" style="align-items:center;">
+          <span class="muted" id="syncStatus"></span>
+          <button type="button" class="secondary" id="logoutBtn">Sign out</button>
+        </span>
+      </div>
+      <p class="muted" id="accountLoading" style="margin:0;font-size:0.8125rem;">Connecting…</p>
+    </section>
 
     <section>
       <h2>Set variables</h2>
@@ -234,6 +338,31 @@
       <div class="value" id="cashflow">$0.00</div>
     </div>
 
+    <section id="snapshotsSection" style="margin-top:1rem;" hidden>
+      <h2>Snapshots</h2>
+      <div class="editing" id="editingBox" hidden>
+        Editing snapshot <strong id="editingName"></strong>
+        <span class="muted" id="editingDirty"></span>
+        <div class="row">
+          <button type="button" id="updateSnapshotBtn">Update snapshot</button>
+          <button type="button" class="secondary" id="revertSnapshotBtn">Revert to snapshot</button>
+          <button type="button" class="secondary" id="stopEditingBtn">Stop editing</button>
+        </div>
+      </div>
+      <form class="row" id="snapshotForm">
+        <label>
+          <span>Snapshot name</span>
+          <input type="text" id="snapshotName" maxlength="255" placeholder="e.g. November plan" />
+        </label>
+        <button type="submit" id="saveSnapshotBtn">Save new snapshot</button>
+      </form>
+      <p class="status-error" id="snapshotError" style="margin:0.6rem 0 0;font-size:0.8125rem;" hidden></p>
+      <p class="muted" id="snapshotEmpty" style="margin:0.85rem 0 0;font-size:0.8125rem;" hidden>
+        No snapshots yet. Save one to keep the current numbers and results.
+      </p>
+      <ul class="snapshot-list" id="snapshotList"></ul>
+    </section>
+
     <p class="hint">
       Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
       Taxes = revenue × tax %. Payroll = employee rate × employee hours.
@@ -246,7 +375,9 @@
   <script>
     const byId = (id) => document.getElementById(id);
 
-    const STORAGE_KEY = "cashflow-calculator-v4";
+    const API_BASE = "/api";
+    const LEGACY_STORAGE_KEY = "cashflow-calculator-v4";
+    const SAVE_DEBOUNCE_MS = 600;
 
     const ids = [
       "taxPct", "employeeRate", "billableRate",
@@ -270,25 +401,87 @@
       overheadMisc: "250",
     };
 
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const saved = raw ? JSON.parse(raw) : {};
-        ids.forEach((id) => {
-          const v = saved[id];
-          byId(id).value = v !== undefined && v !== "" ? String(v) : defaults[id];
-        });
-      } catch {
-        ids.forEach((id) => { byId(id).value = defaults[id]; });
+    const state = {
+      user: null,
+      snapshots: [],
+      editingId: null,
+      saveTimer: null,
+      saving: false,
+    };
+
+    /* ── API (Intintus backend via same-origin /api proxy, cookie auth) ── */
+
+    class ApiError extends Error {
+      constructor(status, message) {
+        super(message);
+        this.status = status;
       }
     }
 
-    function saveState() {
+    async function rawFetch(path, options = {}) {
+      return fetch(API_BASE + path, {
+        ...options,
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...(options.headers || {}),
+        },
+      });
+    }
+
+    async function errorMessage(resp) {
+      try {
+        const body = await resp.json();
+        const d = body.detail;
+        if (typeof d === "string") return d;
+        if (Array.isArray(d)) return d.map((e) => e.msg).filter(Boolean).join("; ");
+        if (d && typeof d.message === "string") return d.message;
+        return JSON.stringify(body);
+      } catch {
+        return resp.statusText || "Request failed";
+      }
+    }
+
+    async function api(path, options = {}, retry = true) {
+      const resp = await rawFetch(path, options);
+      if (resp.status === 401 && retry && !path.startsWith("/users/login")) {
+        const refreshed = await rawFetch("/users/refresh-token", { method: "POST" });
+        if (refreshed.ok) return api(path, options, false);
+        handleSignedOut();
+      }
+      if (!resp.ok) throw new ApiError(resp.status, await errorMessage(resp));
+      if (resp.status === 204) return null;
+      return resp.json();
+    }
+
+    /* ── Fields ── */
+
+    function readInputs() {
       const data = {};
       ids.forEach((id) => { data[id] = byId(id).value; });
+      return data;
+    }
+
+    function applyInputs(saved) {
+      ids.forEach((id) => {
+        const v = saved ? saved[id] : undefined;
+        byId(id).value = v !== undefined && v !== null && v !== "" ? String(v) : defaults[id];
+      });
+    }
+
+    function readLegacyInputs() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch { /* quota / private mode */ }
+        const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+        const saved = raw ? JSON.parse(raw) : null;
+        return saved && typeof saved === "object" && Object.keys(saved).length ? saved : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function clearLegacyInputs() {
+      try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { /* ignore */ }
     }
 
     function num(id) {
@@ -304,7 +497,11 @@
       });
     }
 
-    function recalc() {
+    function round2(n) {
+      return Math.round(n * 100) / 100;
+    }
+
+    function computeResults() {
       const taxPct = num("taxPct");
       const employeeRate = num("employeeRate");
       const billableRate = num("billableRate");
@@ -325,26 +522,364 @@
       const taxes = revenue * (taxPct / 100);
       const payroll = employeeRate * employeeHours;
       const internalLabor = internalHours * employeeRate;
-      const overhead = internalLabor + overheadCursor + overheadHosting + overheadMisc;
-      const cashflow = revenue - taxes - payroll - myPayout - overhead;
+      const overheadTotal = internalLabor + overheadCursor + overheadHosting + overheadMisc;
+      const cashflow = revenue - taxes - payroll - myPayout - overheadTotal;
 
-      byId("revenue").value = money(revenue);
-      byId("taxes").value = money(taxes);
-      byId("payroll").value = money(payroll);
-      byId("internalLabor").value = money(internalLabor);
-      byId("overheadTotal").value = money(overhead);
-      byId("cashflow").textContent = money(cashflow);
+      return { revenue, taxes, payroll, internalLabor, overheadTotal, cashflow };
+    }
+
+    function roundedResults() {
+      const r = computeResults();
+      const out = {};
+      Object.keys(r).forEach((k) => { out[k] = round2(r[k]); });
+      return out;
+    }
+
+    function recalc() {
+      const r = computeResults();
+
+      byId("revenue").value = money(r.revenue);
+      byId("taxes").value = money(r.taxes);
+      byId("payroll").value = money(r.payroll);
+      byId("internalLabor").value = money(r.internalLabor);
+      byId("overheadTotal").value = money(r.overheadTotal);
+      byId("cashflow").textContent = money(r.cashflow);
 
       const box = byId("cashflowBox");
       box.classList.remove("zero", "positive", "negative");
-      if (cashflow === 0) box.classList.add("zero");
-      else if (cashflow > 0) box.classList.add("positive");
+      if (r.cashflow === 0) box.classList.add("zero");
+      else if (r.cashflow > 0) box.classList.add("positive");
       else box.classList.add("negative");
     }
 
-    function onFieldUpdate() {
-      saveState();
+    /* ── Working-state sync ── */
+
+    function setSyncStatus(text, isError = false) {
+      const el = byId("syncStatus");
+      el.textContent = text;
+      el.classList.toggle("status-error", isError);
+    }
+
+    function scheduleSave() {
+      if (!state.user) return;
+      clearTimeout(state.saveTimer);
+      setSyncStatus("Unsaved changes…");
+      state.saveTimer = setTimeout(saveState, SAVE_DEBOUNCE_MS);
+    }
+
+    async function saveState() {
+      if (!state.user) return;
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+      setSyncStatus("Saving…");
+      try {
+        await api("/cashflow/state", {
+          method: "PUT",
+          body: JSON.stringify({ inputs: readInputs() }),
+        });
+        if (!state.saveTimer) setSyncStatus("Saved");
+      } catch (e) {
+        setSyncStatus("Save failed: " + e.message, true);
+      }
+    }
+
+    async function loadServerState() {
+      const remote = await api("/cashflow/state");
+      const remoteInputs = remote && remote.inputs ? remote.inputs : {};
+      if (Object.keys(remoteInputs).length) {
+        applyInputs(remoteInputs);
+        clearLegacyInputs();
+        setSyncStatus("Saved");
+        return;
+      }
+      // First sign-in: carry over numbers that used to live in localStorage.
+      applyInputs(readLegacyInputs() || defaults);
+      await saveState();
+      clearLegacyInputs();
+    }
+
+    /* ── Snapshots ── */
+
+    function setSnapshotError(msg) {
+      const el = byId("snapshotError");
+      el.textContent = msg || "";
+      el.hidden = !msg;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, {
+        month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+      });
+    }
+
+    function editingSnapshot() {
+      return state.snapshots.find((s) => s.id === state.editingId) || null;
+    }
+
+    function inputsMatch(a, b) {
+      return ids.every((id) => String(a[id] ?? defaults[id]) === String(b[id] ?? defaults[id]));
+    }
+
+    function renderEditing() {
+      const snap = editingSnapshot();
+      byId("editingBox").hidden = !snap;
+      if (!snap) return;
+      byId("editingName").textContent = snap.name;
+      const dirty = !inputsMatch(readInputs(), snap.inputs || {});
+      byId("editingDirty").textContent = dirty ? "— changes not saved to snapshot" : "— matches snapshot";
+      byId("updateSnapshotBtn").disabled = !dirty;
+      byId("revertSnapshotBtn").disabled = !dirty;
+    }
+
+    function actionButton(label, className, onClick) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      if (className) b.className = className;
+      b.addEventListener("click", onClick);
+      return b;
+    }
+
+    function renderSnapshots() {
+      const list = byId("snapshotList");
+      list.replaceChildren();
+      byId("snapshotEmpty").hidden = state.snapshots.length > 0;
+
+      state.snapshots.forEach((snap) => {
+        const li = document.createElement("li");
+        if (snap.id === state.editingId) li.classList.add("active");
+
+        const meta = document.createElement("div");
+        meta.className = "snapshot-meta";
+        const name = document.createElement("span");
+        name.className = "snapshot-name";
+        name.textContent = snap.name;
+        const sub = document.createElement("span");
+        sub.className = "snapshot-sub";
+        const cash = Number(snap.results && snap.results.cashflow);
+        const cashEl = document.createElement("span");
+        cashEl.className = "snapshot-cash";
+        if (Number.isFinite(cash)) {
+          cashEl.textContent = money(cash);
+          if (cash > 0) cashEl.classList.add("positive");
+          else if (cash < 0) cashEl.classList.add("negative");
+        }
+        const edited = snap.updated_at && snap.updated_at !== snap.created_at
+          ? " · edited " + formatDate(snap.updated_at) : "";
+        sub.append(cashEl, document.createTextNode(" · " + formatDate(snap.created_at) + edited));
+        meta.append(name, sub);
+
+        const actions = document.createElement("div");
+        actions.className = "snapshot-actions";
+        actions.append(
+          actionButton(snap.id === state.editingId ? "Editing" : "Load & edit", "secondary", () => loadSnapshot(snap.id)),
+          actionButton("Rename", "secondary", () => renameSnapshot(snap.id)),
+          actionButton("Delete", "danger", () => deleteSnapshot(snap.id)),
+        );
+
+        li.append(meta, actions);
+        list.append(li);
+      });
+
+      renderEditing();
+    }
+
+    function replaceSnapshot(updated) {
+      state.snapshots = state.snapshots.map((s) => (s.id === updated.id ? updated : s));
+    }
+
+    async function refreshSnapshots() {
+      state.snapshots = await api("/cashflow/snapshots");
+      if (!editingSnapshot()) state.editingId = null;
+      renderSnapshots();
+    }
+
+    async function createSnapshot(e) {
+      e.preventDefault();
+      setSnapshotError("");
+      const nameInput = byId("snapshotName");
+      const name = nameInput.value.trim() ||
+        "Snapshot " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      byId("saveSnapshotBtn").disabled = true;
+      try {
+        const snap = await api("/cashflow/snapshots", {
+          method: "POST",
+          body: JSON.stringify({ name, inputs: readInputs(), results: roundedResults() }),
+        });
+        state.snapshots = [snap, ...state.snapshots];
+        state.editingId = snap.id;
+        nameInput.value = "";
+        renderSnapshots();
+      } catch (err) {
+        setSnapshotError("Could not save snapshot: " + err.message);
+      } finally {
+        byId("saveSnapshotBtn").disabled = false;
+      }
+    }
+
+    function loadSnapshot(id) {
+      const snap = state.snapshots.find((s) => s.id === id);
+      if (!snap || snap.id === state.editingId) return;
+      const current = readInputs();
+      const active = editingSnapshot();
+      const hasUnsavedEdits = active && !inputsMatch(current, active.inputs || {});
+      if (hasUnsavedEdits &&
+          !confirm(`Discard unsaved changes to "${active.name}" and load "${snap.name}"?`)) {
+        return;
+      }
+      state.editingId = id;
+      applyInputs(snap.inputs || {});
       recalc();
+      scheduleSave();
+      renderSnapshots();
+    }
+
+    async function updateSnapshot() {
+      const snap = editingSnapshot();
+      if (!snap) return;
+      setSnapshotError("");
+      byId("updateSnapshotBtn").disabled = true;
+      try {
+        const updated = await api(`/cashflow/snapshots/${snap.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ inputs: readInputs(), results: roundedResults() }),
+        });
+        replaceSnapshot(updated);
+        renderSnapshots();
+      } catch (err) {
+        setSnapshotError("Could not update snapshot: " + err.message);
+        renderEditing();
+      }
+    }
+
+    function revertSnapshot() {
+      const snap = editingSnapshot();
+      if (!snap) return;
+      applyInputs(snap.inputs || {});
+      recalc();
+      scheduleSave();
+      renderEditing();
+    }
+
+    function stopEditing() {
+      state.editingId = null;
+      renderSnapshots();
+    }
+
+    async function renameSnapshot(id) {
+      const snap = state.snapshots.find((s) => s.id === id);
+      if (!snap) return;
+      const name = prompt("Rename snapshot", snap.name);
+      if (name === null || !name.trim() || name.trim() === snap.name) return;
+      setSnapshotError("");
+      try {
+        const updated = await api(`/cashflow/snapshots/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        replaceSnapshot(updated);
+        renderSnapshots();
+      } catch (err) {
+        setSnapshotError("Could not rename snapshot: " + err.message);
+      }
+    }
+
+    async function deleteSnapshot(id) {
+      const snap = state.snapshots.find((s) => s.id === id);
+      if (!snap || !confirm(`Delete snapshot "${snap.name}"?`)) return;
+      setSnapshotError("");
+      try {
+        await api(`/cashflow/snapshots/${id}`, { method: "DELETE" });
+        state.snapshots = state.snapshots.filter((s) => s.id !== id);
+        if (state.editingId === id) state.editingId = null;
+        renderSnapshots();
+      } catch (err) {
+        setSnapshotError("Could not delete snapshot: " + err.message);
+      }
+    }
+
+    /* ── Auth ── */
+
+    function renderAuth() {
+      byId("accountLoading").hidden = true;
+      byId("loginForm").hidden = !!state.user;
+      byId("accountInfo").hidden = !state.user;
+      byId("snapshotsSection").hidden = !state.user;
+      if (state.user) byId("accountEmail").textContent = state.user.email || state.user.username || "";
+    }
+
+    function handleSignedOut() {
+      state.user = null;
+      state.snapshots = [];
+      state.editingId = null;
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+      renderAuth();
+      renderSnapshots();
+    }
+
+    async function handleSignedIn(user) {
+      state.user = user;
+      renderAuth();
+      setSyncStatus("Loading…");
+      try {
+        await loadServerState();
+        recalc();
+        await refreshSnapshots();
+      } catch (e) {
+        setSyncStatus("Load failed: " + e.message, true);
+      }
+    }
+
+    async function login(e) {
+      e.preventDefault();
+      const err = byId("loginError");
+      err.hidden = true;
+      byId("loginBtn").disabled = true;
+      try {
+        await api("/users/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: byId("loginEmail").value.trim(),
+            password: byId("loginPassword").value,
+          }),
+        });
+        byId("loginPassword").value = "";
+        const me = await api("/users/me");
+        await handleSignedIn(me);
+      } catch (ex) {
+        err.textContent = ex.message || "Sign in failed";
+        err.hidden = false;
+      } finally {
+        byId("loginBtn").disabled = false;
+      }
+    }
+
+    async function logout() {
+      if (state.saveTimer) await saveState();
+      try { await rawFetch("/users/logout", { method: "POST" }); } catch { /* ignore */ }
+      handleSignedOut();
+      applyInputs(defaults);
+      recalc();
+    }
+
+    async function boot() {
+      try {
+        const me = await api("/users/me");
+        await handleSignedIn(me);
+      } catch {
+        handleSignedOut();
+      }
+    }
+
+    /* ── Wiring ── */
+
+    function onFieldUpdate() {
+      recalc();
+      renderEditing();
+      scheduleSave();
     }
 
     const app = byId("app");
@@ -352,19 +887,30 @@
       el && el.tagName === "INPUT" && el.type === "number" && !el.readOnly;
 
     function bindField(el) {
-      ["input", "change", "keyup"].forEach((type) => {
+      ["input", "change"].forEach((type) => {
         el.addEventListener(type, onFieldUpdate);
       });
     }
 
-    loadState();
+    applyInputs(readLegacyInputs() || defaults);
 
     app.querySelectorAll('input[type="number"]').forEach(bindField);
     app.addEventListener("focusout", (e) => {
-      if (isNumberInput(e.target)) onFieldUpdate();
+      if (isNumberInput(e.target) && state.saveTimer) saveState();
+    });
+    window.addEventListener("beforeunload", () => {
+      if (state.saveTimer) saveState();
     });
 
+    byId("loginForm").addEventListener("submit", login);
+    byId("logoutBtn").addEventListener("click", logout);
+    byId("snapshotForm").addEventListener("submit", createSnapshot);
+    byId("updateSnapshotBtn").addEventListener("click", updateSnapshot);
+    byId("revertSnapshotBtn").addEventListener("click", revertSnapshot);
+    byId("stopEditingBtn").addEventListener("click", stopEditing);
+
     recalc();
+    boot();
   </script>
 </body>
 </html>
