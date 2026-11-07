@@ -182,6 +182,28 @@
     </section>
 
     <section>
+      <h2>Overhead</h2>
+      <div class="grid grid-2">
+        <label class="span-2">
+          <span>Internal hours</span>
+          <input type="number" id="internalHours" value="8" min="0" step="0.25" />
+        </label>
+        <label>
+          <span>Cursor ($)</span>
+          <input type="number" id="overheadCursor" value="500" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Hosting ($)</span>
+          <input type="number" id="overheadHosting" value="100" min="0" step="0.01" />
+        </label>
+        <label class="span-2">
+          <span>Misc ($)</span>
+          <input type="number" id="overheadMisc" value="250" min="0" step="0.01" />
+        </label>
+      </div>
+    </section>
+
+    <section>
       <h2>Calculated</h2>
       <div class="grid">
         <label>
@@ -196,6 +218,14 @@
           <span>Payroll ($)</span>
           <input type="text" id="payroll" readonly tabindex="-1" />
         </label>
+        <label>
+          <span>Internal labor ($)</span>
+          <input type="text" id="internalLabor" readonly tabindex="-1" />
+        </label>
+        <label>
+          <span>Overhead total ($)</span>
+          <input type="text" id="overheadTotal" readonly tabindex="-1" />
+        </label>
       </div>
     </section>
 
@@ -208,19 +238,21 @@
       Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
       Taxes = revenue × tax %. Payroll = employee rate × employee hours.
       Per employee hour at your rates: $75 − $30 payroll − 30% tax on $75 ≈ $22.50 left after tax &amp; payroll.
-      Monthly cashflow = revenue − taxes − payroll − my payout.
+      Internal labor = internal hours × employee rate. Overhead total = internal labor + Cursor + Hosting + Misc.
+      Monthly cashflow = revenue − taxes − payroll − my payout − overhead total.
     </p>
   </div>
 
   <script>
     const byId = (id) => document.getElementById(id);
 
-    const STORAGE_KEY = "cashflow-calculator-v2";
+    const STORAGE_KEY = "cashflow-calculator-v4";
 
     const ids = [
       "taxPct", "employeeRate", "billableRate",
       "employeeHours", "myHours", "myPayout",
       "projectEmployeeRevenue", "projectMyRevenue",
+      "internalHours", "overheadCursor", "overheadHosting", "overheadMisc",
     ];
 
     const defaults = {
@@ -232,6 +264,10 @@
       myPayout: "2400",
       projectEmployeeRevenue: "0",
       projectMyRevenue: "0",
+      internalHours: "8",
+      overheadCursor: "500",
+      overheadHosting: "100",
+      overheadMisc: "250",
     };
 
     function loadState() {
@@ -277,6 +313,10 @@
       const myPayout = num("myPayout");
       const projectEmployee = num("projectEmployeeRevenue");
       const projectMy = num("projectMyRevenue");
+      const internalHours = num("internalHours");
+      const overheadCursor = num("overheadCursor");
+      const overheadHosting = num("overheadHosting");
+      const overheadMisc = num("overheadMisc");
 
       const hourlyRevenue =
         (myHours + employeeHours) * billableRate;
@@ -284,11 +324,15 @@
       const revenue = hourlyRevenue + projectEmployee + projectMy;
       const taxes = revenue * (taxPct / 100);
       const payroll = employeeRate * employeeHours;
-      const cashflow = revenue - taxes - payroll - myPayout;
+      const internalLabor = internalHours * employeeRate;
+      const overhead = internalLabor + overheadCursor + overheadHosting + overheadMisc;
+      const cashflow = revenue - taxes - payroll - myPayout - overhead;
 
       byId("revenue").value = money(revenue);
       byId("taxes").value = money(taxes);
       byId("payroll").value = money(payroll);
+      byId("internalLabor").value = money(internalLabor);
+      byId("overheadTotal").value = money(overhead);
       byId("cashflow").textContent = money(cashflow);
 
       const box = byId("cashflowBox");
