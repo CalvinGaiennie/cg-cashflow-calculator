@@ -246,9 +246,13 @@
           <span>Employee hourly rate ($)</span>
           <input type="number" id="employeeRate" value="30" min="0" step="0.01" />
         </label>
-        <label class="span-2">
+        <label>
           <span>Billable hour rate ($)</span>
           <input type="number" id="billableRate" value="75" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Employee share of project revenue (%)</span>
+          <input type="number" id="employeeProjectSharePct" value="0" min="0" max="100" step="0.1" />
         </label>
       </div>
     </section>
@@ -323,6 +327,10 @@
           <input type="text" id="payroll" readonly tabindex="-1" />
         </label>
         <label>
+          <span>Employee project payout ($)</span>
+          <input type="text" id="employeeProjectPayout" readonly tabindex="-1" />
+        </label>
+        <label>
           <span>Internal labor ($)</span>
           <input type="text" id="internalLabor" readonly tabindex="-1" />
         </label>
@@ -366,9 +374,10 @@
     <p class="hint">
       Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
       Taxes = revenue × tax %. Payroll = employee rate × employee hours.
+      Employee project payout = project-based employee revenue × employee share %.
       Per employee hour at your rates: $75 − $30 payroll − 30% tax on $75 ≈ $22.50 left after tax &amp; payroll.
       Internal labor = internal hours × employee rate. Overhead total = internal labor + Cursor + Hosting + Misc.
-      Monthly cashflow = revenue − taxes − payroll − my payout − overhead total.
+      Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total.
     </p>
   </div>
 
@@ -380,7 +389,7 @@
     const SAVE_DEBOUNCE_MS = 600;
 
     const ids = [
-      "taxPct", "employeeRate", "billableRate",
+      "taxPct", "employeeRate", "billableRate", "employeeProjectSharePct",
       "employeeHours", "myHours", "myPayout",
       "projectEmployeeRevenue", "projectMyRevenue",
       "internalHours", "overheadCursor", "overheadHosting", "overheadMisc",
@@ -390,6 +399,7 @@
       taxPct: "30",
       employeeRate: "30",
       billableRate: "75",
+      employeeProjectSharePct: "0",
       employeeHours: "100",
       myHours: "20",
       myPayout: "2400",
@@ -509,6 +519,7 @@
       const myHours = num("myHours");
       const myPayout = num("myPayout");
       const projectEmployee = num("projectEmployeeRevenue");
+      const employeeProjectSharePct = num("employeeProjectSharePct");
       const projectMy = num("projectMyRevenue");
       const internalHours = num("internalHours");
       const overheadCursor = num("overheadCursor");
@@ -521,11 +532,12 @@
       const revenue = hourlyRevenue + projectEmployee + projectMy;
       const taxes = revenue * (taxPct / 100);
       const payroll = employeeRate * employeeHours;
+      const employeeProjectPayout = projectEmployee * (employeeProjectSharePct / 100);
       const internalLabor = internalHours * employeeRate;
       const overheadTotal = internalLabor + overheadCursor + overheadHosting + overheadMisc;
-      const cashflow = revenue - taxes - payroll - myPayout - overheadTotal;
+      const cashflow = revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal;
 
-      return { revenue, taxes, payroll, internalLabor, overheadTotal, cashflow };
+      return { revenue, taxes, payroll, employeeProjectPayout, internalLabor, overheadTotal, cashflow };
     }
 
     function roundedResults() {
@@ -541,6 +553,7 @@
       byId("revenue").value = money(r.revenue);
       byId("taxes").value = money(r.taxes);
       byId("payroll").value = money(r.payroll);
+      byId("employeeProjectPayout").value = money(r.employeeProjectPayout);
       byId("internalLabor").value = money(r.internalLabor);
       byId("overheadTotal").value = money(r.overheadTotal);
       byId("cashflow").textContent = money(r.cashflow);
