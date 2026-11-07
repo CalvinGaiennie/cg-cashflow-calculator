@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monthly Cashflow Calculator</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #5b9fd4;
+      --input-bg: #121a26;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Text", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 2rem 1rem 3rem;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-bottom: 1.75rem;
+    }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.35rem;
+      margin-bottom: 1rem;
+    }
+    section h2 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      gap: 0.85rem;
+    }
+    .grid-2 {
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem 1.25rem;
+    }
+    .grid-2 .span-2 {
+      grid-column: 1 / -1;
+    }
+    @media (max-width: 540px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-2 .span-2 { grid-column: auto; }
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.8125rem;
+    }
+    label span { color: var(--muted); }
+    input {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.55rem 0.75rem;
+      width: 100%;
+    }
+    input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+    input[readonly] {
+      opacity: 0.95;
+      cursor: default;
+    }
+    .cashflow {
+      margin-top: 1.25rem;
+      text-align: center;
+      padding: 1.5rem 1rem;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+    }
+    .cashflow .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .cashflow .value {
+      font-size: 2.25rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.15s ease;
+    }
+    .cashflow.zero .value { color: #9aa3ad; }
+    .cashflow.positive .value { color: #3dd68c; }
+    .cashflow.negative .value { color: #f07178; }
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <h1>Monthly Cashflow</h1>
+    <p class="subtitle">Rates, hours, and project revenue update totals live.</p>
+
+    <section>
+      <h2>Set variables</h2>
+      <div class="grid grid-2">
+        <label>
+          <span>Tax %</span>
+          <input type="number" id="taxPct" value="30" min="0" step="0.1" />
+        </label>
+        <label>
+          <span>Employee hourly rate ($)</span>
+          <input type="number" id="employeeRate" value="30" min="0" step="0.01" />
+        </label>
+        <label class="span-2">
+          <span>Billable hour rate ($)</span>
+          <input type="number" id="billableRate" value="75" min="0" step="0.01" />
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Hours &amp; payout</h2>
+      <div class="grid">
+        <label>
+          <span>Employee hours worked</span>
+          <input type="number" id="employeeHours" value="80" min="0" step="0.25" />
+        </label>
+        <label>
+          <span>My hours worked</span>
+          <input type="number" id="myHours" value="60" min="0" step="0.25" />
+        </label>
+        <label>
+          <span>My payout ($)</span>
+          <input type="number" id="myPayout" value="2400" min="0" step="0.01" />
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Project revenue</h2>
+      <div class="grid">
+        <label>
+          <span>Project-based employee generated revenue ($)</span>
+          <input type="number" id="projectEmployeeRevenue" value="0" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>Project-based me generated revenue ($)</span>
+          <input type="number" id="projectMyRevenue" value="0" min="0" step="0.01" />
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Calculated</h2>
+      <div class="grid">
+        <label>
+          <span>Revenue ($)</span>
+          <input type="text" id="revenue" readonly tabindex="-1" />
+        </label>
+        <label>
+          <span>Taxes ($)</span>
+          <input type="text" id="taxes" readonly tabindex="-1" />
+        </label>
+        <label>
+          <span>Payroll ($)</span>
+          <input type="text" id="payroll" readonly tabindex="-1" />
+        </label>
+      </div>
+    </section>
+
+    <div class="cashflow zero" id="cashflowBox">
+      <div class="label">Monthly cashflow</div>
+      <div class="value" id="cashflow">$0.00</div>
+    </div>
+
+    <p class="hint">
+      Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
+      Taxes = revenue × tax %. Payroll = employee rate × employee hours.
+      Per employee hour at your rates: $75 − $30 payroll − 30% tax on $75 ≈ $22.50 left after tax &amp; payroll.
+      Monthly cashflow = revenue − taxes − payroll − my payout.
+    </p>
+  </div>
+
+  <script>
+    const byId = (id) => document.getElementById(id);
+
+    const STORAGE_KEY = "cashflow-calculator-v1";
+
+    const ids = [
+      "taxPct", "employeeRate", "billableRate",
+      "employeeHours", "myHours", "myPayout",
+      "projectEmployeeRevenue", "projectMyRevenue",
+    ];
+
+    const defaults = {
+      taxPct: "30",
+      employeeRate: "30",
+      billableRate: "75",
+      employeeHours: "80",
+      myHours: "60",
+      myPayout: "2400",
+      projectEmployeeRevenue: "0",
+      projectMyRevenue: "0",
+    };
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const saved = raw ? JSON.parse(raw) : {};
+        ids.forEach((id) => {
+          const v = saved[id];
+          byId(id).value = v !== undefined && v !== "" ? String(v) : defaults[id];
+        });
+      } catch {
+        ids.forEach((id) => { byId(id).value = defaults[id]; });
+      }
+    }
+
+    function saveState() {
+      const data = {};
+      ids.forEach((id) => { data[id] = byId(id).value; });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch { /* quota / private mode */ }
+    }
+
+    function num(id) {
+      const v = parseFloat(byId(id).value);
+      return Number.isFinite(v) ? v : 0;
+    }
+
+    function money(n) {
+      const sign = n < 0 ? "-" : "";
+      return sign + "$" + Math.abs(n).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function recalc() {
+      const taxPct = num("taxPct");
+      const employeeRate = num("employeeRate");
+      const billableRate = num("billableRate");
+      const employeeHours = num("employeeHours");
+      const myHours = num("myHours");
+      const myPayout = num("myPayout");
+      const projectEmployee = num("projectEmployeeRevenue");
+      const projectMy = num("projectMyRevenue");
+
+      const hourlyRevenue =
+        (myHours + employeeHours) * billableRate;
+
+      const revenue = hourlyRevenue + projectEmployee + projectMy;
+      const taxes = revenue * (taxPct / 100);
+      const payroll = employeeRate * employeeHours;
+      const cashflow = revenue - taxes - payroll - myPayout;
+
+      byId("revenue").value = money(revenue);
+      byId("taxes").value = money(taxes);
+      byId("payroll").value = money(payroll);
+      byId("cashflow").textContent = money(cashflow);
+
+      const box = byId("cashflowBox");
+      box.classList.remove("zero", "positive", "negative");
+      if (cashflow === 0) box.classList.add("zero");
+      else if (cashflow > 0) box.classList.add("positive");
+      else box.classList.add("negative");
+    }
+
+    function onFieldUpdate() {
+      saveState();
+      recalc();
+    }
+
+    const app = byId("app");
+    const isNumberInput = (el) =>
+      el && el.tagName === "INPUT" && el.type === "number" && !el.readOnly;
+
+    function bindField(el) {
+      ["input", "change", "keyup"].forEach((type) => {
+        el.addEventListener(type, onFieldUpdate);
+      });
+    }
+
+    loadState();
+
+    app.querySelectorAll('input[type="number"]').forEach(bindField);
+    app.addEventListener("focusout", (e) => {
+      if (isNumberInput(e.target)) onFieldUpdate();
+    });
+
+    recalc();
+  </script>
+</body>
+</html>
