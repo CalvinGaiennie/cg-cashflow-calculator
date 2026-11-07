@@ -198,6 +198,35 @@
     .snapshot-cash.negative { color: #f07178; }
     .snapshot-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
     .snapshot-actions button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+    textarea {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.9375rem;
+      padding: 0.55rem 0.75rem;
+      width: 100%;
+      min-height: 4.5rem;
+      resize: vertical;
+    }
+    textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+    .snapshot-list li { align-items: flex-start; }
+    .snapshot-note {
+      flex-basis: 100%;
+      font-size: 0.8125rem;
+      color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border-left: 2px solid var(--border);
+      padding-left: 0.6rem;
+    }
+    .snapshot-note-editor { flex-basis: 100%; display: grid; gap: 0.5rem; }
+    .snapshot-note-editor .row { align-items: center; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -357,12 +386,18 @@
           <button type="button" class="secondary" id="stopEditingBtn">Stop editing</button>
         </div>
       </div>
-      <form class="row" id="snapshotForm">
+      <form class="grid" id="snapshotForm">
+        <div class="row">
+          <label>
+            <span>Snapshot name</span>
+            <input type="text" id="snapshotName" maxlength="255" placeholder="e.g. November plan" />
+          </label>
+          <button type="submit" id="saveSnapshotBtn">Save new snapshot</button>
+        </div>
         <label>
-          <span>Snapshot name</span>
-          <input type="text" id="snapshotName" maxlength="255" placeholder="e.g. November plan" />
+          <span>Snapshot note (optional)</span>
+          <textarea id="snapshotNote" maxlength="20000" placeholder="Why these numbers, assumptions, what changed…"></textarea>
         </label>
-        <button type="submit" id="saveSnapshotBtn">Save new snapshot</button>
       </form>
       <p class="status-error" id="snapshotError" style="margin:0.6rem 0 0;font-size:0.8125rem;" hidden></p>
       <p class="muted" id="snapshotEmpty" style="margin:0.85rem 0 0;font-size:0.8125rem;" hidden>
@@ -379,6 +414,12 @@
       Internal labor = internal hours × employee rate. Overhead total = internal labor + Cursor + Hosting + Misc.
       Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total.
     </p>
+
+    <section id="notesSection" style="margin-top:1rem;">
+      <h2>Notes</h2>
+      <textarea id="generalNote" maxlength="20000" rows="5" placeholder="General notes…"></textarea>
+      <p class="muted" id="notesSignedOut" style="margin:0.5rem 0 0;font-size:0.75rem;">Sign in to save notes.</p>
+    </section>
   </div>
 
   <script>
@@ -415,6 +456,7 @@
       user: null,
       snapshots: [],
       editingId: null,
+      noteEditingId: null,
       saveTimer: null,
       saving: false,
     };
@@ -588,7 +630,7 @@
       try {
         await api("/cashflow/state", {
           method: "PUT",
-          body: JSON.stringify({ inputs: readInputs() }),
+          body: JSON.stringify({ inputs: readInputs(), note: byId("generalNote").value }),
         });
         if (!state.saveTimer) setSyncStatus("Saved");
       } catch (e) {
@@ -599,6 +641,7 @@
     async function loadServerState() {
       const remote = await api("/cashflow/state");
       const remoteInputs = remote && remote.inputs ? remote.inputs : {};
+      byId("generalNote").value = (remote && remote.note) || "";
       if (Object.keys(remoteInputs).length) {
         applyInputs(remoteInputs);
         clearLegacyInputs();
@@ -688,11 +731,36 @@
         actions.className = "snapshot-actions";
         actions.append(
           actionButton(snap.id === state.editingId ? "Editing" : "Load & edit", "secondary", () => loadSnapshot(snap.id)),
+          actionButton(snap.note ? "Edit note" : "Add note", "secondary", () => openNoteEditor(snap.id)),
           actionButton("Rename", "secondary", () => renameSnapshot(snap.id)),
           actionButton("Delete", "danger", () => deleteSnapshot(snap.id)),
         );
 
         li.append(meta, actions);
+
+        if (snap.id === state.noteEditingId) {
+          const editor = document.createElement("div");
+          editor.className = "snapshot-note-editor";
+          const ta = document.createElement("textarea");
+          ta.maxLength = 20000;
+          ta.value = snap.note || "";
+          ta.placeholder = "Note for this snapshot…";
+          const btns = document.createElement("div");
+          btns.className = "row";
+          btns.append(
+            actionButton("Save note", "", () => saveSnapshotNote(snap.id, ta.value)),
+            actionButton("Cancel", "secondary", () => { state.noteEditingId = null; renderSnapshots(); }),
+          );
+          editor.append(ta, btns);
+          li.append(editor);
+          setTimeout(() => ta.focus(), 0);
+        } else if (snap.note) {
+          const note = document.createElement("div");
+          note.className = "snapshot-note";
+          note.textContent = snap.note;
+          li.append(note);
+        }
+
         list.append(li);
       });
 
@@ -701,6 +769,26 @@
 
     function replaceSnapshot(updated) {
       state.snapshots = state.snapshots.map((s) => (s.id === updated.id ? updated : s));
+    }
+
+    function openNoteEditor(id) {
+      state.noteEditingId = id;
+      renderSnapshots();
+    }
+
+    async function saveSnapshotNote(id, note) {
+      setSnapshotError("");
+      try {
+        const updated = await api(`/cashflow/snapshots/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ note }),
+        });
+        replaceSnapshot(updated);
+        state.noteEditingId = null;
+        renderSnapshots();
+      } catch (err) {
+        setSnapshotError("Could not save note: " + err.message);
+      }
     }
 
     async function refreshSnapshots() {
@@ -719,11 +807,17 @@
       try {
         const snap = await api("/cashflow/snapshots", {
           method: "POST",
-          body: JSON.stringify({ name, inputs: readInputs(), results: roundedResults() }),
+          body: JSON.stringify({
+            name,
+            inputs: readInputs(),
+            results: roundedResults(),
+            note: byId("snapshotNote").value,
+          }),
         });
         state.snapshots = [snap, ...state.snapshots];
         state.editingId = snap.id;
         nameInput.value = "";
+        byId("snapshotNote").value = "";
         renderSnapshots();
       } catch (err) {
         setSnapshotError("Could not save snapshot: " + err.message);
@@ -820,6 +914,7 @@
       byId("loginForm").hidden = !!state.user;
       byId("accountInfo").hidden = !state.user;
       byId("snapshotsSection").hidden = !state.user;
+      byId("notesSignedOut").hidden = !!state.user;
       if (state.user) byId("accountEmail").textContent = state.user.email || state.user.username || "";
     }
 
@@ -827,6 +922,7 @@
       state.user = null;
       state.snapshots = [];
       state.editingId = null;
+      state.noteEditingId = null;
       clearTimeout(state.saveTimer);
       state.saveTimer = null;
       renderAuth();
@@ -874,6 +970,7 @@
       if (state.saveTimer) await saveState();
       try { await rawFetch("/users/logout", { method: "POST" }); } catch { /* ignore */ }
       handleSignedOut();
+      byId("generalNote").value = "";
       applyInputs(defaults);
       recalc();
     }
@@ -915,6 +1012,8 @@
       if (state.saveTimer) saveState();
     });
 
+    byId("generalNote").addEventListener("input", scheduleSave);
+    byId("generalNote").addEventListener("blur", () => { if (state.saveTimer) saveState(); });
     byId("loginForm").addEventListener("submit", login);
     byId("logoutBtn").addEventListener("click", logout);
     byId("snapshotForm").addEventListener("submit", createSnapshot);

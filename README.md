@@ -4,6 +4,7 @@ Single-page calculator (`index.html`). Inputs and saved snapshots are stored in 
 
 - Sign in with your Intintus email/password; inputs autosave to `PUT /cashflow/state`.
 - **Snapshots** save the current numbers + computed results. Load one to edit it, then **Update snapshot** to overwrite it; rename or delete from the list.
+- **Notes**: each snapshot can carry a note (shown in the list, editable inline), and a general **Notes** box at the bottom of the page autosaves with your inputs.
 - Values left in the old `localStorage` key (`cashflow-calculator-v4`) are uploaded once on first sign-in, then cleared.
 
 ## Netlify
