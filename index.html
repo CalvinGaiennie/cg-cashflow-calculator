@@ -154,11 +154,11 @@
       <div class="grid">
         <label>
           <span>Employee hours worked</span>
-          <input type="number" id="employeeHours" value="80" min="0" step="0.25" />
+          <input type="number" id="employeeHours" value="100" min="0" step="0.25" />
         </label>
         <label>
           <span>My hours worked</span>
-          <input type="number" id="myHours" value="60" min="0" step="0.25" />
+          <input type="number" id="myHours" value="20" min="0" step="0.25" />
         </label>
         <label>
           <span>My payout ($)</span>
@@ -215,7 +215,7 @@
   <script>
     const byId = (id) => document.getElementById(id);
 
-    const STORAGE_KEY = "cashflow-calculator-v1";
+    const STORAGE_KEY = "cashflow-calculator-v2";
 
     const ids = [
       "taxPct", "employeeRate", "billableRate",
@@ -227,8 +227,8 @@
       taxPct: "30",
       employeeRate: "30",
       billableRate: "75",
-      employeeHours: "80",
-      myHours: "60",
+      employeeHours: "100",
+      myHours: "20",
       myPayout: "2400",
       projectEmployeeRevenue: "0",
       projectMyRevenue: "0",
