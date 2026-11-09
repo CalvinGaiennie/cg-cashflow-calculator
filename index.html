@@ -348,6 +348,10 @@
           <input type="text" id="revenue" readonly tabindex="-1" />
         </label>
         <label>
+          <span>Taxable profit ($)</span>
+          <input type="text" id="taxableProfit" readonly tabindex="-1" />
+        </label>
+        <label>
           <span>Taxes ($)</span>
           <input type="text" id="taxes" readonly tabindex="-1" />
         </label>
@@ -408,10 +412,12 @@
 
     <p class="hint">
       Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
-      Taxes = revenue × tax %. Payroll = employee rate × employee hours.
+      Payroll = employee rate × employee hours.
       Employee project payout = project-based employee revenue × employee share %.
-      Per employee hour at your rates: $75 − $30 payroll − 30% tax on $75 ≈ $22.50 left after tax &amp; payroll.
       Internal labor = internal hours × employee rate. Overhead total = internal labor + Cursor + Hosting + Misc.
+      Taxable profit = revenue − payroll − employee project payout − overhead total (never below $0).
+      Taxes = taxable profit × tax % (taxes are on profit, not revenue; my payout is not deducted).
+      Per employee hour at $75 billable / $30 pay / 30% tax: $75 − $30 payroll = $45 profit; 30% tax on $45 = $13.50; $45 − $13.50 = $31.50 left after tax &amp; payroll (before overhead).
       Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total.
     </p>
 
@@ -572,20 +578,21 @@
         (myHours + employeeHours) * billableRate;
 
       const revenue = hourlyRevenue + projectEmployee + projectMy;
-      const taxes = revenue * (taxPct / 100);
       const payroll = employeeRate * employeeHours;
       const employeeProjectPayout = projectEmployee * (employeeProjectSharePct / 100);
       const internalLabor = internalHours * employeeRate;
       const overheadTotal = internalLabor + overheadCursor + overheadHosting + overheadMisc;
+      const taxableProfit = Math.max(0, revenue - payroll - employeeProjectPayout - overheadTotal);
+      const taxes = taxableProfit * (taxPct / 100);
       const cashflow = revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal;
 
-      return { revenue, taxes, payroll, employeeProjectPayout, internalLabor, overheadTotal, cashflow };
+      return { revenue, taxableProfit, taxes, payroll, employeeProjectPayout, internalLabor, overheadTotal, cashflow };
     }
 
     function roundedResults() {
       const r = computeResults();
       const out = {};
-      Object.keys(r).forEach((k) => { out[k] = round2(r[k]); });
+      Object.keys(r).forEach((k) => { if (k !== "taxableProfit") out[k] = round2(r[k]); });
       return out;
     }
 
@@ -593,6 +600,7 @@
       const r = computeResults();
 
       byId("revenue").value = money(r.revenue);
+      byId("taxableProfit").value = money(r.taxableProfit);
       byId("taxes").value = money(r.taxes);
       byId("payroll").value = money(r.payroll);
       byId("employeeProjectPayout").value = money(r.employeeProjectPayout);
