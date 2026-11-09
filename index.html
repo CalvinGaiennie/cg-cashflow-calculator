@@ -94,6 +94,23 @@
       opacity: 0.95;
       cursor: default;
     }
+    label.checkbox-label {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    label.checkbox-label span { color: var(--text); }
+    input[type="checkbox"] {
+      width: 1.15rem;
+      height: 1.15rem;
+      flex-shrink: 0;
+      padding: 0;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
     .cashflow {
       margin-top: 1.25rem;
       text-align: center;
@@ -301,6 +318,14 @@
           <span>My payout ($)</span>
           <input type="number" id="myPayout" value="2400" min="0" step="0.01" />
         </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="coverPersonalTax" checked />
+          <span>Pay my income tax completely for me</span>
+        </label>
+        <label id="personalTaxRateField">
+          <span>Personal income tax rate (%)</span>
+          <input type="number" id="personalTaxRate" value="35" min="0" max="100" step="0.1" />
+        </label>
       </div>
     </section>
 
@@ -371,6 +396,10 @@
           <span>Overhead total ($)</span>
           <input type="text" id="overheadTotal" readonly tabindex="-1" />
         </label>
+        <label>
+          <span>Personal income tax covered ($)</span>
+          <input type="text" id="personalTaxCovered" readonly tabindex="-1" />
+        </label>
       </div>
     </section>
 
@@ -418,7 +447,9 @@
       Taxable profit = revenue − payroll − employee project payout − overhead total (never below $0).
       Taxes = taxable profit × tax % (taxes are on profit, not revenue; my payout is not deducted).
       Per employee hour at $75 billable / $30 pay / 30% tax: $75 − $30 payroll = $45 profit; 30% tax on $45 = $13.50; $45 − $13.50 = $31.50 left after tax &amp; payroll (before overhead).
-      Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total.
+      Personal income tax covered = my payout × personal income tax rate % when “Pay my income tax completely for me” is checked; $0 when unchecked.
+      Checking it means the business pays your personal income tax on your payout from its own cash, so you don't set it aside from your pay; it lowers the business's cashflow, not your payout.
+      Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total − personal income tax covered.
     </p>
 
     <section id="notesSection" style="margin-top:1rem;">
@@ -440,6 +471,7 @@
       "employeeHours", "myHours", "myPayout",
       "projectEmployeeRevenue", "projectMyRevenue",
       "internalHours", "overheadCursor", "overheadHosting", "overheadMisc",
+      "coverPersonalTax", "personalTaxRate",
     ];
 
     const defaults = {
@@ -456,6 +488,8 @@
       overheadCursor: "500",
       overheadHosting: "100",
       overheadMisc: "250",
+      coverPersonalTax: "1",
+      personalTaxRate: "35",
     };
 
     const state = {
@@ -517,15 +551,22 @@
 
     function readInputs() {
       const data = {};
-      ids.forEach((id) => { data[id] = byId(id).value; });
+      ids.forEach((id) => {
+        const el = byId(id);
+        data[id] = el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value;
+      });
       return data;
     }
 
     function applyInputs(saved) {
       ids.forEach((id) => {
         const v = saved ? saved[id] : undefined;
-        byId(id).value = v !== undefined && v !== null && v !== "" ? String(v) : defaults[id];
+        const value = v !== undefined && v !== null && v !== "" ? String(v) : defaults[id];
+        const el = byId(id);
+        if (el.type === "checkbox") el.checked = value === "1";
+        else el.value = value;
       });
+      syncPersonalTaxField();
     }
 
     function readLegacyInputs() {
@@ -540,6 +581,10 @@
 
     function clearLegacyInputs() {
       try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { /* ignore */ }
+    }
+
+    function syncPersonalTaxField() {
+      byId("personalTaxRateField").hidden = !byId("coverPersonalTax").checked;
     }
 
     function num(id) {
@@ -573,6 +618,8 @@
       const overheadCursor = num("overheadCursor");
       const overheadHosting = num("overheadHosting");
       const overheadMisc = num("overheadMisc");
+      const coverPersonalTax = byId("coverPersonalTax").checked;
+      const personalTaxRate = num("personalTaxRate");
 
       const hourlyRevenue =
         (myHours + employeeHours) * billableRate;
@@ -584,9 +631,14 @@
       const overheadTotal = internalLabor + overheadCursor + overheadHosting + overheadMisc;
       const taxableProfit = Math.max(0, revenue - payroll - employeeProjectPayout - overheadTotal);
       const taxes = taxableProfit * (taxPct / 100);
-      const cashflow = revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal;
+      const personalTaxCovered = coverPersonalTax ? myPayout * (personalTaxRate / 100) : 0;
+      const cashflow =
+        revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal - personalTaxCovered;
 
-      return { revenue, taxableProfit, taxes, payroll, employeeProjectPayout, internalLabor, overheadTotal, cashflow };
+      return {
+        revenue, taxableProfit, taxes, payroll, employeeProjectPayout,
+        internalLabor, overheadTotal, personalTaxCovered, cashflow,
+      };
     }
 
     function roundedResults() {
@@ -606,6 +658,7 @@
       byId("employeeProjectPayout").value = money(r.employeeProjectPayout);
       byId("internalLabor").value = money(r.internalLabor);
       byId("overheadTotal").value = money(r.overheadTotal);
+      byId("personalTaxCovered").value = money(r.personalTaxCovered);
       byId("cashflow").textContent = money(r.cashflow);
 
       const box = byId("cashflowBox");
@@ -692,8 +745,14 @@
       if (!snap) return;
       byId("editingName").textContent = snap.name;
       const dirty = !inputsMatch(readInputs(), snap.inputs || {});
-      byId("editingDirty").textContent = dirty ? "— changes not saved to snapshot" : "— matches snapshot";
-      byId("updateSnapshotBtn").disabled = !dirty;
+      const staleResults = !dirty &&
+        Number(snap.results && snap.results.cashflow) !== roundedResults().cashflow;
+      byId("editingDirty").textContent = dirty
+        ? "— changes not saved to snapshot"
+        : staleResults
+          ? "— saved totals use older formulas; Update snapshot to save the recalculated totals"
+          : "— matches snapshot";
+      byId("updateSnapshotBtn").disabled = !dirty && !staleResults;
       byId("revertSnapshotBtn").disabled = !dirty;
     }
 
@@ -1013,6 +1072,10 @@
     applyInputs(readLegacyInputs() || defaults);
 
     app.querySelectorAll('input[type="number"]').forEach(bindField);
+    byId("coverPersonalTax").addEventListener("change", () => {
+      syncPersonalTaxField();
+      onFieldUpdate();
+    });
     app.addEventListener("focusout", (e) => {
       if (isNumberInput(e.target) && state.saveTimer) saveState();
     });
