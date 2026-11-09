@@ -292,6 +292,7 @@
         <label>
           <span>Employee hours worked</span>
           <input type="number" id="employeeHours" value="0" min="0" step="0.25" />
+          <span id="employeeHoursWeekly" style="font-size:0.75rem;"></span>
         </label>
         <label>
           <span>My billable hours worked</span>
@@ -436,6 +437,7 @@
     const API_BASE = "/api";
     const LEGACY_STORAGE_KEY = "cashflow-calculator-v4";
     const SAVE_DEBOUNCE_MS = 600;
+    const WEEKS_PER_MONTH = 4;
 
     const ids = [
       "taxPct", "employeeRate", "billableRate", "employeeProjectSharePct",
@@ -562,6 +564,10 @@
       });
     }
 
+    function fmtHours(n) {
+      return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    }
+
     function round2(n) {
       return Math.round(n * 100) / 100;
     }
@@ -629,6 +635,10 @@
     }
 
     function recalc() {
+      const employeeHours = num("employeeHours");
+      byId("employeeHoursWeekly").textContent = employeeHours >= 0
+        ? `(${fmtHours(employeeHours / WEEKS_PER_MONTH)}/w)` : "";
+
       const errors = validationErrors();
       const valid = errors.length === 0;
       const msg = byId("validationError");
@@ -786,10 +796,11 @@
           const v = parseFloat(inputs[id] ?? defaults[id]);
           return Number.isFinite(v) ? v : 0;
         };
-        const hours = (id) => savedNum(id).toLocaleString("en-US", { maximumFractionDigits: 2 });
+        const hours = (id) => fmtHours(savedNum(id));
+        const weeklyEmployeeHours = fmtHours(savedNum("employeeHours") / WEEKS_PER_MONTH);
         const figures = document.createElement("span");
         figures.className = "snapshot-sub";
-        figures.textContent = `My billable hrs ${hours("myHours")} · Employee hrs ${hours("employeeHours")}` +
+        figures.textContent = `My billable hrs ${hours("myHours")} · Employee hrs ${hours("employeeHours")} (${weeklyEmployeeHours}/w)` +
           ` · Owner distributions ${money(savedNum("myPayout"))}`;
         meta.append(name, sub, figures);
 
