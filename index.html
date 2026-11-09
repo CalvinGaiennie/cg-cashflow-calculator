@@ -94,23 +94,6 @@
       opacity: 0.95;
       cursor: default;
     }
-    label.checkbox-label {
-      flex-direction: row;
-      align-items: center;
-      gap: 0.6rem;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-    label.checkbox-label span { color: var(--text); }
-    input[type="checkbox"] {
-      width: 1.15rem;
-      height: 1.15rem;
-      flex-shrink: 0;
-      padding: 0;
-      margin: 0;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
     .cashflow {
       margin-top: 1.25rem;
       text-align: center;
@@ -285,16 +268,16 @@
       <h2>Set variables</h2>
       <div class="grid grid-2">
         <label>
-          <span>Tax %</span>
-          <input type="number" id="taxPct" value="30" min="0" step="0.1" />
+          <span>Tax rate on profit (%)</span>
+          <input type="number" id="taxPct" value="35" min="0" max="100" step="0.1" />
         </label>
         <label>
           <span>Employee hourly rate ($)</span>
-          <input type="number" id="employeeRate" value="30" min="0" step="0.01" />
+          <input type="number" id="employeeRate" value="0" min="0" step="0.01" />
         </label>
         <label>
           <span>Billable hour rate ($)</span>
-          <input type="number" id="billableRate" value="75" min="0" step="0.01" />
+          <input type="number" id="billableRate" value="0" min="0" step="0.01" />
         </label>
         <label>
           <span>Employee share of project revenue (%)</span>
@@ -308,23 +291,15 @@
       <div class="grid">
         <label>
           <span>Employee hours worked</span>
-          <input type="number" id="employeeHours" value="100" min="0" step="0.25" />
+          <input type="number" id="employeeHours" value="0" min="0" step="0.25" />
         </label>
         <label>
           <span>My hours worked</span>
-          <input type="number" id="myHours" value="20" min="0" step="0.25" />
+          <input type="number" id="myHours" value="0" min="0" step="0.25" />
         </label>
         <label>
-          <span>My payout ($)</span>
-          <input type="number" id="myPayout" value="2400" min="0" step="0.01" />
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" id="coverPersonalTax" checked />
-          <span>Pay my income tax completely for me</span>
-        </label>
-        <label id="personalTaxRateField">
-          <span>Personal income tax rate (%)</span>
-          <input type="number" id="personalTaxRate" value="35" min="0" max="100" step="0.1" />
+          <span>Owner distributions ($) — does not change taxes</span>
+          <input type="number" id="myPayout" value="0" min="0" step="0.01" />
         </label>
       </div>
     </section>
@@ -348,26 +323,27 @@
       <div class="grid grid-2">
         <label class="span-2">
           <span>Internal hours</span>
-          <input type="number" id="internalHours" value="8" min="0" step="0.25" />
+          <input type="number" id="internalHours" value="0" min="0" step="0.25" />
         </label>
         <label>
           <span>Cursor ($)</span>
-          <input type="number" id="overheadCursor" value="500" min="0" step="0.01" />
+          <input type="number" id="overheadCursor" value="0" min="0" step="0.01" />
         </label>
         <label>
           <span>Hosting ($)</span>
-          <input type="number" id="overheadHosting" value="100" min="0" step="0.01" />
+          <input type="number" id="overheadHosting" value="0" min="0" step="0.01" />
         </label>
         <label class="span-2">
           <span>Misc ($)</span>
-          <input type="number" id="overheadMisc" value="250" min="0" step="0.01" />
+          <input type="number" id="overheadMisc" value="0" min="0" step="0.01" />
         </label>
       </div>
     </section>
 
     <section>
       <h2>Calculated</h2>
-      <div class="grid">
+      <p class="status-error" id="validationError" style="margin:0;font-size:0.8125rem;" hidden></p>
+      <div class="grid" id="resultsGrid">
         <label>
           <span>Revenue ($)</span>
           <input type="text" id="revenue" readonly tabindex="-1" />
@@ -377,7 +353,7 @@
           <input type="text" id="taxableProfit" readonly tabindex="-1" />
         </label>
         <label>
-          <span>Taxes ($)</span>
+          <span>Tax reserve — set aside ($)</span>
           <input type="text" id="taxes" readonly tabindex="-1" />
         </label>
         <label>
@@ -395,10 +371,6 @@
         <label>
           <span>Overhead total ($)</span>
           <input type="text" id="overheadTotal" readonly tabindex="-1" />
-        </label>
-        <label>
-          <span>Personal income tax covered ($)</span>
-          <input type="text" id="personalTaxCovered" readonly tabindex="-1" />
         </label>
       </div>
     </section>
@@ -440,16 +412,15 @@
     </section>
 
     <p class="hint">
-      Revenue = (my hours + employee hours) × billable rate + project revenues (what you bill).
-      Payroll = employee rate × employee hours.
+      Revenue = (my hours + employee hours) × billable rate + project-based employee revenue + project-based my revenue.
+      Payroll = employee hourly rate × employee hours.
       Employee project payout = project-based employee revenue × employee share %.
-      Internal labor = internal hours × employee rate. Overhead total = internal labor + Cursor + Hosting + Misc.
+      Internal labor = internal hours × employee hourly rate. Overhead total = internal labor + Cursor + Hosting + Misc.
       Taxable profit = revenue − payroll − employee project payout − overhead total (never below $0).
-      Taxes = taxable profit × tax % (taxes are on profit, not revenue; my payout is not deducted).
-      Per employee hour at $75 billable / $30 pay / 30% tax: $75 − $30 payroll = $45 profit; 30% tax on $45 = $13.50; $45 − $13.50 = $31.50 left after tax &amp; payroll (before overhead).
-      Personal income tax covered = my payout × personal income tax rate % when “Pay my income tax completely for me” is checked; $0 when unchecked.
-      Checking it means the business pays your personal income tax on your payout from its own cash, so you don't set it aside from your pay; it lowers the business's cashflow, not your payout.
-      Monthly cashflow = revenue − taxes − payroll − employee project payout − my payout − overhead total − personal income tax covered.
+      Tax reserve = taxable profit × tax rate on profit % — the LLC's profit is taxed whether or not you take it out, so set this aside.
+      Owner distributions are not deducted from taxable profit; they don't change taxes, only how much cash stays in the business.
+      Per employee hour at $75 billable / $30 pay / 35% tax: $75 − $30 payroll = $45 profit; 35% tax on $45 = $15.75; $45 − $15.75 = $29.25 left after tax &amp; payroll (before overhead).
+      Monthly cashflow = revenue − taxes − payroll − employee project payout − owner distributions − overhead total.
     </p>
 
     <section id="notesSection" style="margin-top:1rem;">
@@ -471,26 +442,25 @@
       "employeeHours", "myHours", "myPayout",
       "projectEmployeeRevenue", "projectMyRevenue",
       "internalHours", "overheadCursor", "overheadHosting", "overheadMisc",
-      "coverPersonalTax", "personalTaxRate",
     ];
 
     const defaults = {
-      taxPct: "30",
-      employeeRate: "30",
-      billableRate: "75",
+      taxPct: "35",
+      employeeRate: "0",
+      billableRate: "0",
       employeeProjectSharePct: "0",
-      employeeHours: "100",
-      myHours: "20",
-      myPayout: "2400",
+      employeeHours: "0",
+      myHours: "0",
+      myPayout: "0",
       projectEmployeeRevenue: "0",
       projectMyRevenue: "0",
-      internalHours: "8",
-      overheadCursor: "500",
-      overheadHosting: "100",
-      overheadMisc: "250",
-      coverPersonalTax: "1",
-      personalTaxRate: "35",
+      internalHours: "0",
+      overheadCursor: "0",
+      overheadHosting: "0",
+      overheadMisc: "0",
     };
+
+    const percentIds = ["taxPct", "employeeProjectSharePct"];
 
     const state = {
       user: null,
@@ -552,8 +522,7 @@
     function readInputs() {
       const data = {};
       ids.forEach((id) => {
-        const el = byId(id);
-        data[id] = el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value;
+        data[id] = byId(id).value;
       });
       return data;
     }
@@ -562,11 +531,8 @@
       ids.forEach((id) => {
         const v = saved ? saved[id] : undefined;
         const value = v !== undefined && v !== null && v !== "" ? String(v) : defaults[id];
-        const el = byId(id);
-        if (el.type === "checkbox") el.checked = value === "1";
-        else el.value = value;
+        byId(id).value = value;
       });
-      syncPersonalTaxField();
     }
 
     function readLegacyInputs() {
@@ -583,10 +549,6 @@
       try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { /* ignore */ }
     }
 
-    function syncPersonalTaxField() {
-      byId("personalTaxRateField").hidden = !byId("coverPersonalTax").checked;
-    }
-
     function num(id) {
       const v = parseFloat(byId(id).value);
       return Number.isFinite(v) ? v : 0;
@@ -594,7 +556,7 @@
 
     function money(n) {
       const sign = n < 0 ? "-" : "";
-      return sign + "$" + Math.abs(n).toLocaleString(undefined, {
+      return sign + "$" + Math.abs(n).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
@@ -602,6 +564,26 @@
 
     function round2(n) {
       return Math.round(n * 100) / 100;
+    }
+
+    function fieldLabel(id) {
+      return byId(id).closest("label").querySelector("span").textContent.split(" — ")[0];
+    }
+
+    function validationErrors() {
+      const errors = [];
+      ids.forEach((id) => {
+        const el = byId(id);
+        const v = parseFloat(el.value);
+        if (el.validity.badInput) errors.push(`${fieldLabel(id)} must be a number.`);
+        else if (percentIds.includes(id) && (v < 0 || v > 100)) errors.push(`${fieldLabel(id)} must be between 0 and 100.`);
+        else if (v < 0) errors.push(`${fieldLabel(id)} must be 0 or greater.`);
+      });
+      return errors;
+    }
+
+    function inputsValid() {
+      return validationErrors().length === 0;
     }
 
     function computeResults() {
@@ -618,8 +600,6 @@
       const overheadCursor = num("overheadCursor");
       const overheadHosting = num("overheadHosting");
       const overheadMisc = num("overheadMisc");
-      const coverPersonalTax = byId("coverPersonalTax").checked;
-      const personalTaxRate = num("personalTaxRate");
 
       const hourlyRevenue =
         (myHours + employeeHours) * billableRate;
@@ -631,13 +611,12 @@
       const overheadTotal = internalLabor + overheadCursor + overheadHosting + overheadMisc;
       const taxableProfit = Math.max(0, revenue - payroll - employeeProjectPayout - overheadTotal);
       const taxes = taxableProfit * (taxPct / 100);
-      const personalTaxCovered = coverPersonalTax ? myPayout * (personalTaxRate / 100) : 0;
       const cashflow =
-        revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal - personalTaxCovered;
+        revenue - taxes - payroll - employeeProjectPayout - myPayout - overheadTotal;
 
       return {
         revenue, taxableProfit, taxes, payroll, employeeProjectPayout,
-        internalLabor, overheadTotal, personalTaxCovered, cashflow,
+        internalLabor, overheadTotal, cashflow,
       };
     }
 
@@ -649,6 +628,16 @@
     }
 
     function recalc() {
+      const errors = validationErrors();
+      const valid = errors.length === 0;
+      const msg = byId("validationError");
+      msg.textContent = errors.join(" ");
+      msg.hidden = valid;
+      byId("resultsGrid").hidden = !valid;
+      byId("cashflowBox").hidden = !valid;
+      byId("saveSnapshotBtn").disabled = !valid;
+      if (!valid) return;
+
       const r = computeResults();
 
       byId("revenue").value = money(r.revenue);
@@ -658,7 +647,6 @@
       byId("employeeProjectPayout").value = money(r.employeeProjectPayout);
       byId("internalLabor").value = money(r.internalLabor);
       byId("overheadTotal").value = money(r.overheadTotal);
-      byId("personalTaxCovered").value = money(r.personalTaxCovered);
       byId("cashflow").textContent = money(r.cashflow);
 
       const box = byId("cashflowBox");
@@ -752,7 +740,7 @@
         : staleResults
           ? "— saved totals use older formulas; Update snapshot to save the recalculated totals"
           : "— matches snapshot";
-      byId("updateSnapshotBtn").disabled = !dirty && !staleResults;
+      byId("updateSnapshotBtn").disabled = !inputsValid() || (!dirty && !staleResults);
       byId("revertSnapshotBtn").disabled = !dirty;
     }
 
@@ -867,6 +855,7 @@
     async function createSnapshot(e) {
       e.preventDefault();
       setSnapshotError("");
+      if (!inputsValid()) return;
       const nameInput = byId("snapshotName");
       const name = nameInput.value.trim() ||
         "Snapshot " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -889,7 +878,7 @@
       } catch (err) {
         setSnapshotError("Could not save snapshot: " + err.message);
       } finally {
-        byId("saveSnapshotBtn").disabled = false;
+        byId("saveSnapshotBtn").disabled = !inputsValid();
       }
     }
 
@@ -912,7 +901,7 @@
 
     async function updateSnapshot() {
       const snap = editingSnapshot();
-      if (!snap) return;
+      if (!snap || !inputsValid()) return;
       setSnapshotError("");
       byId("updateSnapshotBtn").disabled = true;
       try {
@@ -1072,10 +1061,6 @@
     applyInputs(readLegacyInputs() || defaults);
 
     app.querySelectorAll('input[type="number"]').forEach(bindField);
-    byId("coverPersonalTax").addEventListener("change", () => {
-      syncPersonalTaxField();
-      onFieldUpdate();
-    });
     app.addEventListener("focusout", (e) => {
       if (isNumberInput(e.target) && state.saveTimer) saveState();
     });
