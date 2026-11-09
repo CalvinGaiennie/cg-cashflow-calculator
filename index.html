@@ -319,12 +319,12 @@
           <input type="number" id="myPayout" value="2400" min="0" step="0.01" />
         </label>
         <label class="checkbox-label">
-          <input type="checkbox" id="coverPersonalTax" />
+          <input type="checkbox" id="coverPersonalTax" checked />
           <span>Pay my income tax completely for me</span>
         </label>
-        <label id="personalTaxRateField" hidden>
+        <label id="personalTaxRateField">
           <span>Personal income tax rate (%)</span>
-          <input type="number" id="personalTaxRate" value="0" min="0" max="100" step="0.1" />
+          <input type="number" id="personalTaxRate" value="35" min="0" max="100" step="0.1" />
         </label>
       </div>
     </section>
@@ -488,8 +488,8 @@
       overheadCursor: "500",
       overheadHosting: "100",
       overheadMisc: "250",
-      coverPersonalTax: "0",
-      personalTaxRate: "0",
+      coverPersonalTax: "1",
+      personalTaxRate: "35",
     };
 
     const state = {
