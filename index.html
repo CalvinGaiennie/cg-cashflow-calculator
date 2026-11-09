@@ -781,7 +781,17 @@
         const edited = snap.updated_at && snap.updated_at !== snap.created_at
           ? " · edited " + formatDate(snap.updated_at) : "";
         sub.append(cashEl, document.createTextNode(" · " + formatDate(snap.created_at) + edited));
-        meta.append(name, sub);
+        const inputs = snap.inputs || {};
+        const savedNum = (id) => {
+          const v = parseFloat(inputs[id] ?? defaults[id]);
+          return Number.isFinite(v) ? v : 0;
+        };
+        const hours = (id) => savedNum(id).toLocaleString("en-US", { maximumFractionDigits: 2 });
+        const figures = document.createElement("span");
+        figures.className = "snapshot-sub";
+        figures.textContent = `My billable hrs ${hours("myHours")} · Employee hrs ${hours("employeeHours")}` +
+          ` · Owner distributions ${money(savedNum("myPayout"))}`;
+        meta.append(name, sub, figures);
 
         const actions = document.createElement("div");
         actions.className = "snapshot-actions";
