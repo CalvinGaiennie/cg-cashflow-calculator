@@ -436,6 +436,7 @@
     const API_BASE = "/api";
     const LEGACY_STORAGE_KEY = "cashflow-calculator-v4";
     const SAVE_DEBOUNCE_MS = 600;
+    const WEEKS_PER_MONTH = 4;
 
     const ids = [
       "taxPct", "employeeRate", "billableRate", "employeeProjectSharePct",
@@ -786,10 +787,12 @@
           const v = parseFloat(inputs[id] ?? defaults[id]);
           return Number.isFinite(v) ? v : 0;
         };
-        const hours = (id) => savedNum(id).toLocaleString("en-US", { maximumFractionDigits: 2 });
+        const fmtHours = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+        const hours = (id) => fmtHours(savedNum(id));
+        const weeklyEmployeeHours = fmtHours(savedNum("employeeHours") / WEEKS_PER_MONTH);
         const figures = document.createElement("span");
         figures.className = "snapshot-sub";
-        figures.textContent = `My billable hrs ${hours("myHours")} · Employee hrs ${hours("employeeHours")}` +
+        figures.textContent = `My billable hrs ${hours("myHours")} · Employee hrs ${hours("employeeHours")} (${weeklyEmployeeHours}/w)` +
           ` · Owner distributions ${money(savedNum("myPayout"))}`;
         meta.append(name, sub, figures);
 
