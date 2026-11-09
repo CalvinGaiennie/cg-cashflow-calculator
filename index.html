@@ -576,6 +576,7 @@
         const el = byId(id);
         const v = parseFloat(el.value);
         if (el.validity.badInput) errors.push(`${fieldLabel(id)} must be a number.`);
+        else if (id === "taxPct" && el.value === "") errors.push(`${fieldLabel(id)} is required.`);
         else if (percentIds.includes(id) && (v < 0 || v > 100)) errors.push(`${fieldLabel(id)} must be between 0 and 100.`);
         else if (v < 0) errors.push(`${fieldLabel(id)} must be 0 or greater.`);
       });
