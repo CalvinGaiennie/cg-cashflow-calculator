@@ -745,8 +745,14 @@
       if (!snap) return;
       byId("editingName").textContent = snap.name;
       const dirty = !inputsMatch(readInputs(), snap.inputs || {});
-      byId("editingDirty").textContent = dirty ? "— changes not saved to snapshot" : "— matches snapshot";
-      byId("updateSnapshotBtn").disabled = !dirty;
+      const staleResults = !dirty &&
+        Number(snap.results && snap.results.cashflow) !== roundedResults().cashflow;
+      byId("editingDirty").textContent = dirty
+        ? "— changes not saved to snapshot"
+        : staleResults
+          ? "— saved totals use older formulas; Update snapshot to save the recalculated totals"
+          : "— matches snapshot";
+      byId("updateSnapshotBtn").disabled = !dirty && !staleResults;
       byId("revertSnapshotBtn").disabled = !dirty;
     }
 
